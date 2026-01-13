@@ -3,17 +3,50 @@ import { parseMapUrl } from '@/lib/urlParser';
 import { generateGpx, decodePolyline, GpxPoint } from '@/lib/gpxGenerator';
 import { trackConversion } from '@/lib/usageTracking';
 
-interface DirectionsResponse {
+interface MapboxDirectionsResponse {
     routes: Array<{
-        overview_polyline: {
-            points: string;
-        };
+        geometry: string; // encoded polyline
         legs: Array<{
-            start_address: string;
-            end_address: string;
+            summary: string;
         }>;
     }>;
-    status: string;
+    code: string;
+}
+
+interface NominatimResponse {
+    lat: string;
+    lon: string;
+    display_name: string;
+}
+
+/**
+ * Geocode using OpenStreetMap Nominatim (free, no API key needed)
+ */
+async function geocodeNominatim(placeName: string): Promise<[number, number] | null> {
+    try {
+        const cleanedName = decodeURIComponent(placeName).replace(/\+/g, ' ').trim();
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanedName)}&format=json&limit=1`;
+
+        const response = await fetch(url, {
+            headers: {
+                'User-Agent': 'MapToGPX/1.0'
+            }
+        });
+        const data: NominatimResponse[] = await response.json();
+
+        if (data && data.length > 0) {
+            const lon = parseFloat(data[0].lon);
+            const lat = parseFloat(data[0].lat);
+            console.log(`✓ Geocoded "${cleanedName}" to [${lon}, ${lat}] - ${data[0].display_name}`);
+            return [lon, lat];
+        }
+
+        console.log(`✗ Could not geocode "${cleanedName}"`);
+        return null;
+    } catch (error) {
+        console.error('Geocoding error:', error);
+        return null;
+    }
 }
 
 export async function POST(request: NextRequest) {
@@ -27,8 +60,36 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        // Expand shortened URLs
+        let urlToParse = mapUrl;
+        if (mapUrl.includes('maps.app.goo.gl') || mapUrl.includes('goo.gl')) {
+            try {
+                const response = await fetch(mapUrl, {
+                    method: 'HEAD',
+                    redirect: 'follow',
+                    headers: {
+                        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                    }
+                });
+
+                if (response.url === mapUrl) {
+                    const getResponse = await fetch(mapUrl, {
+                        headers: { 'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36' }
+                    });
+                    urlToParse = getResponse.url;
+                } else {
+                    urlToParse = response.url;
+                }
+            } catch (error) {
+                console.warn('Failed to expand URL:', error);
+            }
+        }
+
+        console.log('Expanded URL:', urlToParse);
+
         // Parse the URL
-        const parsed = parseMapUrl(mapUrl);
+        const parsed = parseMapUrl(urlToParse);
+        console.log('Parsed:', JSON.stringify(parsed, null, 2));
 
         if (parsed.provider === 'unsupported') {
             return NextResponse.json(
@@ -39,52 +100,91 @@ export async function POST(request: NextRequest) {
 
         if (!parsed.origin || !parsed.destination) {
             return NextResponse.json(
-                { error: 'Could not extract route information from this URL.' },
+                { error: `Could not extract route information from URL.` },
                 { status: 400 }
             );
         }
 
-        // Build Google Directions API request
-        const apiKey = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY;
-        if (!apiKey) {
+        // Get Mapbox access token
+        const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+        if (!accessToken) {
             return NextResponse.json(
-                { error: 'Server configuration error' },
+                { error: 'Server configuration error: Missing Mapbox Access Token' },
                 { status: 500 }
             );
         }
 
-        let directionsUrl = `https://maps.googleapis.com/maps/api/directions/json?origin=${encodeURIComponent(parsed.origin)}&destination=${encodeURIComponent(parsed.destination)}&key=${apiKey}`;
-
-        // Add waypoints if present (Google Maps only)
-        if (parsed.waypoints && parsed.waypoints.length > 0) {
-            const waypointsParam = parsed.waypoints.join('|');
-            directionsUrl += `&waypoints=${encodeURIComponent(waypointsParam)}`;
-        }
-
-        // Add travel mode if present
-        if (parsed.travelMode) {
-            directionsUrl += `&mode=${parsed.travelMode}`;
-        }
-
-        // Fetch route from Google Directions API
-        const response = await fetch(directionsUrl);
-        const data: DirectionsResponse = await response.json();
-
-        if (data.status !== 'OK' || !data.routes || data.routes.length === 0) {
+        // Geocode using Nominatim (free, better coverage)
+        console.log('Geocoding origin:', parsed.origin);
+        const originCoords = await geocodeNominatim(parsed.origin);
+        if (!originCoords) {
             return NextResponse.json(
-                { error: 'We couldn\'t fetch this route. Please try again.' },
+                { error: `Could not find location: ${parsed.origin}` },
+                { status: 400 }
+            );
+        }
+
+        console.log('Geocoding destination:', parsed.destination);
+        const destCoords = await geocodeNominatim(parsed.destination);
+        if (!destCoords) {
+            return NextResponse.json(
+                { error: `Could not find location: ${parsed.destination}` },
+                { status: 400 }
+            );
+        }
+
+        // Build coordinates string for Mapbox Directions
+        let coordinates = `${originCoords[0]},${originCoords[1]};${destCoords[0]},${destCoords[1]}`;
+        console.log('Coordinates:', coordinates);
+
+        // Add waypoints if present
+        if (parsed.waypoints && parsed.waypoints.length > 0) {
+            const waypointCoords = await Promise.all(
+                parsed.waypoints.map(wp => geocodeNominatim(wp))
+            );
+
+            const validWaypoints = waypointCoords.filter(c => c !== null) as [number, number][];
+
+            if (validWaypoints.length > 0) {
+                const waypointStr = validWaypoints.map(c => `${c[0]},${c[1]}`).join(';');
+                coordinates = `${originCoords[0]},${originCoords[1]};${waypointStr};${destCoords[0]},${destCoords[1]}`;
+            }
+        }
+
+        // Determine profile
+        let profile = 'driving';
+        if (parsed.travelMode) {
+            const mode = parsed.travelMode.toLowerCase();
+            if (mode === 'walking') profile = 'walking';
+            else if (mode === 'bicycling' || mode === 'cycling') profile = 'cycling';
+        }
+
+        // Fetch route from Mapbox Directions API
+        const directionsUrl = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${coordinates}?geometries=polyline&access_token=${accessToken}`;
+
+        console.log('Fetching route from Mapbox...');
+        const response = await fetch(directionsUrl);
+        const data: MapboxDirectionsResponse = await response.json();
+
+        if (data.code !== 'Ok' || !data.routes || data.routes.length === 0) {
+            console.error('Mapbox error:', data.code);
+            return NextResponse.json(
+                {
+                    error: `Route fetch failed: ${data.code || 'Unknown Error'}`,
+                    details: 'Could not calculate route between these locations.'
+                },
                 { status: 400 }
             );
         }
 
         // Decode polyline to GPX points
-        const polyline = data.routes[0].overview_polyline.points;
+        const polyline = data.routes[0].geometry;
         const points: GpxPoint[] = decodePolyline(polyline);
 
         // Generate GPX
         const gpxContent = generateGpx(points, 'Route');
 
-        // Track conversion and check if support prompt should be shown
+        // Track conversion
         const showSupportPrompt = await trackConversion(anonId);
 
         return NextResponse.json({

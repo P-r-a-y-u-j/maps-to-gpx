@@ -27,15 +27,15 @@ Visit [http://localhost:3000](http://localhost:3000)
 
 ## 🔑 Environment Setup
 
-### 1. Google Maps API Key
+### 1. Mapbox Access Token
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project
-3. Enable **Directions API**
-4. Create API Key
+1. Go to [mapbox.com](https://www.mapbox.com/)
+2. Sign up for a free account (100,000 requests/month free)
+3. Go to your [Account Dashboard](https://account.mapbox.com/)
+4. Copy your **Default Public Token** (starts with `pk.`)
 5. Add to `.env.local`:
    ```
-   NEXT_PUBLIC_GOOGLE_MAPS_API_KEY=your_key_here
+   NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.your_token_here
    ```
 
 ### 2. Firebase Configuration
@@ -81,7 +81,7 @@ href="https://www.buymeacoffee.com/YOUR_USERNAME"
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Database**: Firebase Firestore
-- **API**: Google Directions API
+- **API**: Mapbox Directions & Geocoding APIs
 - **Hosting**: Vercel (recommended)
 
 ## 📤 Deployment
