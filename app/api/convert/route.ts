@@ -21,11 +21,52 @@ interface NominatimResponse {
 
 /**
  * Geocode using OpenStreetMap Nominatim (free, no API key needed)
+ * Tries multiple fallback strategies for better success rate
  */
 async function geocodeNominatim(placeName: string): Promise<[number, number] | null> {
+    const cleanedName = decodeURIComponent(placeName).replace(/\+/g, ' ').trim();
+
+    // Strategy 1: Try the full address
+    let coords = await tryNominatimGeocode(cleanedName);
+    if (coords) return coords;
+
+    // Strategy 2: Try removing everything before the first comma (remove building/landmark name)
+    const parts = cleanedName.split(',').map(p => p.trim()).filter(p => p.length > 0);
+    if (parts.length > 1) {
+        // Try last 3 parts (usually: area, city, state/country)
+        if (parts.length >= 3) {
+            coords = await tryNominatimGeocode(parts.slice(-3).join(', '));
+            if (coords) return coords;
+        }
+
+        // Try last 2 parts (usually: city, state/country)
+        if (parts.length >= 2) {
+            coords = await tryNominatimGeocode(parts.slice(-2).join(', '));
+            if (coords) return coords;
+        }
+
+        // Try just the last part (usually: state/country)
+        coords = await tryNominatimGeocode(parts[parts.length - 1]);
+        if (coords) return coords;
+    }
+
+    // Strategy 3: Try extracting just landmark/city names (look for common patterns)
+    const landmarkMatch = cleanedName.match(/^([^,]+)/);
+    if (landmarkMatch) {
+        coords = await tryNominatimGeocode(landmarkMatch[1]);
+        if (coords) return coords;
+    }
+
+    console.log(`✗ All geocoding strategies failed for: "${cleanedName}"`);
+    return null;
+}
+
+/**
+ * Helper to try geocoding with Nominatim
+ */
+async function tryNominatimGeocode(query: string): Promise<[number, number] | null> {
     try {
-        const cleanedName = decodeURIComponent(placeName).replace(/\+/g, ' ').trim();
-        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(cleanedName)}&format=json&limit=1`;
+        const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(query)}&format=json&limit=1`;
 
         const response = await fetch(url, {
             headers: {
@@ -37,14 +78,13 @@ async function geocodeNominatim(placeName: string): Promise<[number, number] | n
         if (data && data.length > 0) {
             const lon = parseFloat(data[0].lon);
             const lat = parseFloat(data[0].lat);
-            console.log(`✓ Geocoded "${cleanedName}" to [${lon}, ${lat}] - ${data[0].display_name}`);
+            console.log(`✓ Geocoded "${query}" → [${lon}, ${lat}] (${data[0].display_name})`);
             return [lon, lat];
         }
 
-        console.log(`✗ Could not geocode "${cleanedName}"`);
         return null;
     } catch (error) {
-        console.error('Geocoding error:', error);
+        console.error('Geocoding error for', query, ':', error);
         return null;
     }
 }
