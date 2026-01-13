@@ -38,6 +38,13 @@ Visit [http://localhost:3000](http://localhost:3000)
    MAPBOX_ACCESS_TOKEN=pk.your_token_here
    ```
 
+### 3. Firebase Remote Config (Optional - for dynamic app list)
+
+The compatible apps carousel can be managed via Firebase Remote Config:
+
+1. See [REMOTE_CONFIG_SETUP.md](./REMOTE_CONFIG_SETUP.md) for detailed instructions
+2. If not configured, the app uses default hardcoded apps
+
 ### 2. Firebase Configuration
 
 1. Go to [Firebase Console](https://console.firebase.google.com/)

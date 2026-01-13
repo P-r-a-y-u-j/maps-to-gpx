@@ -84,7 +84,7 @@ export default function Converter() {
                                     onChange={(e) => setMapUrl(e.target.value)}
                                     onKeyDown={(e) => e.key === 'Enter' && handleConvert()}
                                     placeholder="Paste your Google Maps or Apple Maps link here..."
-                                    className="w-full px-6 py-4 text-lg rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors placeholder:text-gray-400"
+                                    className="w-full px-6 py-4 text-lg text-gray-900 rounded-xl border-2 border-gray-200 focus:border-blue-500 focus:outline-none transition-colors placeholder:text-gray-400"
                                     disabled={loading}
                                 />
                                 {mapUrl && (
