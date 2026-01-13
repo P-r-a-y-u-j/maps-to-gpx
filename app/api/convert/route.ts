@@ -105,8 +105,8 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // Get Mapbox access token
-        const accessToken = process.env.NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN;
+        // Get Mapbox access token (server-side only - not exposed to browser)
+        const accessToken = process.env.MAPBOX_ACCESS_TOKEN;
         if (!accessToken) {
             return NextResponse.json(
                 { error: 'Server configuration error: Missing Mapbox Access Token' },

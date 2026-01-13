@@ -35,7 +35,7 @@ Visit [http://localhost:3000](http://localhost:3000)
 4. Copy your **Default Public Token** (starts with `pk.`)
 5. Add to `.env.local`:
    ```
-   NEXT_PUBLIC_MAPBOX_ACCESS_TOKEN=pk.your_token_here
+   MAPBOX_ACCESS_TOKEN=pk.your_token_here
    ```
 
 ### 2. Firebase Configuration

@@ -8,6 +8,7 @@ export default function Converter() {
     const [mapUrl, setMapUrl] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+    const [success, setSuccess] = useState(false);
     const [showAppleWarning, setShowAppleWarning] = useState(false);
     const [showSupportPrompt, setShowSupportPrompt] = useState(false);
 
@@ -19,6 +20,7 @@ export default function Converter() {
 
         setLoading(true);
         setError('');
+        setSuccess(false);
         setShowAppleWarning(false);
 
         try {
@@ -59,9 +61,13 @@ export default function Converter() {
             window.URL.revokeObjectURL(url);
             document.body.removeChild(a);
 
+            // Show success message
+            setSuccess(true);
+            setTimeout(() => setSuccess(false), 5000);
+
             // Show support prompt if needed
             if (data.showSupportPrompt) {
-                setTimeout(() => setShowSupportPrompt(true), 500);
+                setTimeout(() => setShowSupportPrompt(true), 1000);
             }
 
             // Clear input
@@ -75,12 +81,15 @@ export default function Converter() {
     };
 
     return (
-        <div className="w-full max-w-2xl mx-auto">
-            <div className="glass rounded-2xl p-8 shadow-2xl">
-                <div className="space-y-4">
+        <div className="w-full max-w-3xl mx-auto">
+            <div className="relative p-8 md:p-10 rounded-3xl bg-gradient-to-br from-slate-800/50 to-slate-900/50 border border-slate-700/50 backdrop-blur-xl shadow-2xl">
+                {/* Glow effect */}
+                <div className="absolute inset-0 rounded-3xl bg-gradient-to-r from-blue-500/10 via-purple-500/10 to-pink-500/10 blur-xl"></div>
+
+                <div className="relative space-y-6">
                     <div>
-                        <label htmlFor="mapUrl" className="block text-sm font-medium mb-2">
-                            Paste your map link
+                        <label htmlFor="mapUrl" className="block text-sm font-semibold mb-3 text-gray-300">
+                            📍 Paste your map link
                         </label>
                         <input
                             id="mapUrl"
@@ -89,41 +98,68 @@ export default function Converter() {
                             onChange={(e) => setMapUrl(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleConvert()}
                             placeholder="https://maps.google.com/... or https://maps.apple.com/..."
-                            className="w-full px-4 py-3 rounded-lg bg-white/50 dark:bg-gray-800/50 border border-gray-300 dark:border-gray-600 focus:outline-none focus:ring-2 focus:ring-primary-500 transition-all"
+                            className="w-full px-5 py-4 rounded-xl bg-slate-900/50 border border-slate-600 text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                             disabled={loading}
                         />
                     </div>
 
                     {error && (
-                        <div className="bg-red-100 dark:bg-red-900/30 border border-red-300 dark:border-red-700 text-red-700 dark:text-red-300 px-4 py-3 rounded-lg animate-fade-in">
-                            {error}
+                        <div className="bg-red-500/10 border border-red-500/30 text-red-300 px-5 py-4 rounded-xl animate-fade-in backdrop-blur-sm">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl">❌</span>
+                                <div className="flex-1">
+                                    <p className="font-semibold mb-1">Conversion Failed</p>
+                                    <p className="text-sm text-red-200">{error}</p>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
+                    {success && (
+                        <div className="bg-green-500/10 border border-green-500/30 text-green-300 px-5 py-4 rounded-xl animate-fade-in backdrop-blur-sm">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl">✅</span>
+                                <div className="flex-1">
+                                    <p className="font-semibold mb-1">Success!</p>
+                                    <p className="text-sm text-green-200">Your GPX file has been downloaded. Check your downloads folder!</p>
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     {showAppleWarning && (
-                        <div className="bg-yellow-100 dark:bg-yellow-900/30 border border-yellow-300 dark:border-yellow-700 text-yellow-800 dark:text-yellow-300 px-4 py-3 rounded-lg animate-fade-in">
-                            <p className="font-semibold mb-1">⚠️ Apple Maps Limitation</p>
-                            <p className="text-sm">
-                                Apple Maps does not include intermediate stops. This GPX is recreated using start and end locations only.
-                            </p>
+                        <div className="bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 px-5 py-4 rounded-xl animate-fade-in backdrop-blur-sm">
+                            <div className="flex items-start gap-3">
+                                <span className="text-xl">⚠️</span>
+                                <div className="flex-1">
+                                    <p className="font-semibold mb-1">Apple Maps Limitation</p>
+                                    <p className="text-sm text-yellow-200">
+                                        Apple Maps does not include intermediate stops. This GPX is recreated using start and end locations only.
+                                    </p>
+                                </div>
+                            </div>
                         </div>
                     )}
 
                     <button
                         onClick={handleConvert}
                         disabled={loading}
-                        className="w-full gradient-primary text-white font-bold py-4 px-6 rounded-lg hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+                        className="w-full bg-gradient-to-r from-blue-500 via-purple-500 to-pink-500 text-white font-bold py-5 px-8 rounded-xl hover:shadow-2xl hover:scale-[1.02] active:scale-[0.98] transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 shadow-lg"
                     >
                         {loading ? (
-                            <span className="flex items-center justify-center gap-2">
-                                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24">
+                            <span className="flex items-center justify-center gap-3">
+                                <svg className="animate-spin h-6 w-6" viewBox="0 0 24 24">
                                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                                 </svg>
-                                Converting...
+                                <span>Converting your route...</span>
                             </span>
                         ) : (
-                            'Convert to GPX'
+                            <span className="flex items-center justify-center gap-2">
+                                <span>✨</span>
+                                <span>Convert to GPX</span>
+                                <span>→</span>
+                            </span>
                         )}
                     </button>
                 </div>
